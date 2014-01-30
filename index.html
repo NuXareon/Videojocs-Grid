@@ -1,0 +1,63 @@
+<html>
+<head>
+	<style>
+		body {
+			margin: 0px;
+			padding: 0px;
+		}
+	</style>
+	<script src="requestAnimFrame.js"></script>
+	<script src="Keyboard.js"></script>
+	<script src="socket.io.min.js"></script>
+</head>
+<body>
+	<div id="canvas">
+		<canvas id="myCanvas" width="600" height="600"></canvas>
+	</div>
+	<script>
+
+		var socket = io.connect('http://localhost:4242');
+
+		var canvas = document.getElementById('myCanvas');
+		var context = canvas.getContext('2d');
+
+		var Keyboard = new KeyboardJS(false);
+
+		var grid = {};
+
+		function Cell(){
+
+		}
+
+		socket.on('gridUpdate', function (cell) {
+			var newcell = new Cell();
+			newcell.position = cell.position;
+			newcell.player = cell.player;
+			grid[cell.pos] = newcell;
+		});
+
+// TODO
+		function render() {
+			context.clearRect(0,0,canvas.width,canvas.height);
+
+				context.fillStyle = 'green';
+				context.fillRect(0,0,600,600);
+			var i = 0;
+			for (playerId in players) {
+				players[playerId].render(context,i);
+				i += 1;
+			};
+		}
+
+		function logic() {
+			for (playerId in players) players[playerId].logic();
+		}
+
+		function mainLoop() {
+			requestAnimFrame(mainLoop);
+			logic();
+			render();
+		}
+		requestAnimFrame(mainLoop);
+	</script>
+</body>
