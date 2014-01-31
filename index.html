@@ -17,40 +17,121 @@
 	<script>
 
 		var socket = io.connect('http://localhost:4242');
+		socket.id = socket.socket.sessionid;
 
 		var canvas = document.getElementById('myCanvas');
 		var context = canvas.getContext('2d');
 
-		var Keyboard = new KeyboardJS(false);
+		var keyboard = new KeyboardJS(false);
 
 		var grid = {};
+		var cellSize = 40;
+		var margin = 5;
+
+		var keyDDown = false;
+		var keyADown = false;
+		var keyWDown = false;
+		var keySDown = false;
+		var keyD = 68;
+		var keyA = 65;
+		var keyW = 87;
+		var keyS = 83;
+
+		document.addEventListener('keydown',function (e) {
+			for (position in grid) {
+				if (grid[position].player == socket.socket.sessionid) {					
+					if (e.keyCode == keyD && !keyDDown) {
+						socket.emit('moveRight',position);
+						keyDDown = true;
+					}
+					else if (e.keyCode == keyA && !keyADown) {
+						socket.emit('moveLeft',position);
+						keyADown = true;
+					}
+					else if (e.keyCode == keyW && !keyWDown) {
+						socket.emit('moveUp',position);
+						keyWDown = true;
+					} 
+					else if (e.keyCode == keyS && !keySDown) {
+						socket.emit('moveDown',position);
+						keySDown = true;
+					}
+				}
+			}
+		});
+
+		document.addEventListener('keyup', function (e) {
+			if (e.keyCode == keyD) keyDDown = false;
+			else if (e.keyCode == keyA) keyADown = false;
+			else if (e.keyCode == keyW) keyWDown = false;
+			else if (e.keyCode == keyS) keySDown = false;
+		});
 
 		function Cell(){
+
+		}
+		Cell.prototype.render = function (ctx) {
+			ctx.fillStyle = this.color;
+			ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+		}
+		Cell.prototype.logic = function() {
 
 		}
 
 		socket.on('gridUpdate', function (cell) {
 			var newcell = new Cell();
 			newcell.position = cell.position;
+			newcell.x = cell.x;
+			newcell.y = cell.y;
 			newcell.player = cell.player;
-			grid[cell.pos] = newcell;
+			newcell.color = cell.color;
+			grid[cell.position] = newcell;
 		});
 
-// TODO
+		socket.on('deleteCell', function (pos) {
+			delete grid[pos];
+		});
+
+		function printGrid (ctx) {
+
+			ctx.strokeStyle = 'black';
+
+			// Iterate for x.
+			for (var i = 0; i <= canvas.width; i += cellSize) {
+				ctx.beginPath();
+				ctx.moveTo(i,0);
+				ctx.lineTo(i,canvas.height);
+				ctx.stroke();
+			}
+
+			// Iterate for y.
+			for (var i = 0; i <= canvas.height; i += cellSize) {
+				ctx.beginPath();
+				ctx.moveTo(0,i);
+				ctx.lineTo(canvas.width,i);
+				ctx.stroke();
+			}
+		}
+
 		function render() {
 			context.clearRect(0,0,canvas.width,canvas.height);
 
-				context.fillStyle = 'green';
-				context.fillRect(0,0,600,600);
-			var i = 0;
-			for (playerId in players) {
-				players[playerId].render(context,i);
-				i += 1;
+			printGrid(context);
+
+			for (position in grid) {
+				context.save();
+				context.translate(margin,margin);
+				grid[position].render(context);
+				context.restore();
 			};
 		}
 
 		function logic() {
-			for (playerId in players) players[playerId].logic();
+			for (position in grid) {
+				if (grid[position].player == socket.socket.sessionid) { 
+					grid[position].logic();
+				}
+			}
 		}
 
 		function mainLoop() {
