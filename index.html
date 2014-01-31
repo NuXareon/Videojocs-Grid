@@ -12,7 +12,7 @@
 </head>
 <body>
 	<div id="canvas">
-		<canvas id="myCanvas" width="600" height="600"></canvas>
+		<canvas id="myCanvas"></canvas>
 	</div>
 	<script>
 
@@ -23,49 +23,31 @@
 		var context = canvas.getContext('2d');
 
 		var keyboard = new KeyboardJS(false);
+		var camera = new Camera(canvas.width/2, canvas.height/2);
+
+		var map_width = 1200;
+		var map_height = 1200;
+
+		var players = {};
 
 		var grid = {};
 		var cellSize = 40;
 		var margin = 5;
 
-		var keyDDown = false;
-		var keyADown = false;
-		var keyWDown = false;
-		var keySDown = false;
+		var oldKeys = {};
 		var keyD = 68;
 		var keyA = 65;
 		var keyW = 87;
 		var keyS = 83;
+		var keyI = 73;
+		var keyJ = 74;
+		var keyK = 75;
+		var keyL = 76;
 
-		document.addEventListener('keydown',function (e) {
-			for (position in grid) {
-				if (grid[position].player == socket.socket.sessionid) {					
-					if (e.keyCode == keyD && !keyDDown) {
-						socket.emit('moveRight',position);
-						keyDDown = true;
-					}
-					else if (e.keyCode == keyA && !keyADown) {
-						socket.emit('moveLeft',position);
-						keyADown = true;
-					}
-					else if (e.keyCode == keyW && !keyWDown) {
-						socket.emit('moveUp',position);
-						keyWDown = true;
-					} 
-					else if (e.keyCode == keyS && !keySDown) {
-						socket.emit('moveDown',position);
-						keySDown = true;
-					}
-				}
-			}
-		});
-
-		document.addEventListener('keyup', function (e) {
-			if (e.keyCode == keyD) keyDDown = false;
-			else if (e.keyCode == keyA) keyADown = false;
-			else if (e.keyCode == keyW) keyWDown = false;
-			else if (e.keyCode == keyS) keySDown = false;
-		});
+		function Camera(x,y){
+			this.x = x-canvas.width/2;
+			this.y = y-canvas.height/2;
+		}
 
 		function Cell(){
 
@@ -73,18 +55,47 @@
 		Cell.prototype.render = function (ctx) {
 			ctx.fillStyle = this.color;
 			ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+			if (this.type == 'player'){
+				ctx.fillStyle = 'red';
+				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,cellSize-margin*2+6,5);
+				ctx.fillStyle = 'green';
+				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,(cellSize-margin*2+6)*players[this.player].HP/100,5);
+			}
 		}
 		Cell.prototype.logic = function() {
 
 		}
+
+		function Player(id){
+			this.id = id;
+		}
+		Player.prototype.updateData = function (player){
+			this.HP = player.HP;
+			this.AD = player.AD;
+		}
+
+		socket.on('playerUpdate', function (player){
+			if (players[player.id] === undefined){
+				var newPlayer = new Player(player.id);
+				players[player.id] = newPlayer;
+			}
+			players[player.id].updateData(player);
+		});
+
+		socket.on('deletePlayer', function (id) {
+			delete players[id];
+		});
 
 		socket.on('gridUpdate', function (cell) {
 			var newcell = new Cell();
 			newcell.position = cell.position;
 			newcell.x = cell.x;
 			newcell.y = cell.y;
+			newcell.type = cell.type;
 			newcell.player = cell.player;
 			newcell.color = cell.color;
+			newcell.AD = cell.AD;
+			newcell.HP = cell.HP;
 			grid[cell.position] = newcell;
 		});
 
@@ -97,24 +108,35 @@
 			ctx.strokeStyle = 'black';
 
 			// Iterate for x.
-			for (var i = 0; i <= canvas.width; i += cellSize) {
+			for (var i = 0; i <= map_width; i += cellSize) {
 				ctx.beginPath();
 				ctx.moveTo(i,0);
-				ctx.lineTo(i,canvas.height);
+				ctx.lineTo(i,map_height);
 				ctx.stroke();
 			}
 
 			// Iterate for y.
-			for (var i = 0; i <= canvas.height; i += cellSize) {
+			for (var i = 0; i <= map_height; i += cellSize) {
 				ctx.beginPath();
 				ctx.moveTo(0,i);
-				ctx.lineTo(canvas.width,i);
+				ctx.lineTo(map_width,i);
 				ctx.stroke();
 			}
 		}
 
 		function render() {
 			context.clearRect(0,0,canvas.width,canvas.height);
+
+			//	Camera translate
+			for (position in grid){
+				if (grid[position].player == socket.socket.sessionid){
+					camera.x += (grid[position].x*cellSize+cellSize/2 - canvas.width/2 - camera.x)/20;
+					camera.y += (grid[position].y*cellSize+cellSize/2 - canvas.height/2 - camera.y)/20;
+				}
+			}
+
+			context.save();
+			context.translate(-camera.x,-camera.y);
 
 			printGrid(context);
 
@@ -123,12 +145,57 @@
 				context.translate(margin,margin);
 				grid[position].render(context);
 				context.restore();
-			};
+			}
+
+			context.restore()
 		}
 
 		function logic() {
+
 			for (position in grid) {
 				if (grid[position].player == socket.socket.sessionid) { 
+
+					//	Movement keys (WASD)
+					var dataMove = {pos: position, dir:{x:0,y:0}};
+					if (!oldKeys[keyW] && keyboard.keys[keyW]) {
+						dataMove['dir']['y'] = -1;
+						socket.emit('move',dataMove);
+					}
+					if (!oldKeys[keyA] && keyboard.keys[keyA]) {
+						dataMove['dir']['x'] = -1;
+						socket.emit('move',dataMove);
+					}
+					if (!oldKeys[keyS] && keyboard.keys[keyS]) {
+						dataMove['dir']['y'] = 1;
+						socket.emit('move',dataMove);
+					}
+					if (!oldKeys[keyD] && keyboard.keys[keyD]) {
+						dataMove['dir']['x'] = 1;
+						socket.emit('move',dataMove);
+					}
+
+					//	Attack keys(IJKL)
+					var dataAttack = {pos: position, dir:{x:0,y:0}};
+					if (!oldKeys[keyI] && keyboard.keys[keyI]) {
+						dataAttack['dir']['y'] = -1;
+						socket.emit('attack',dataAttack);
+					}
+					if (!oldKeys[keyJ] && keyboard.keys[keyJ]) {
+						dataAttack['dir']['x'] = -1;
+						socket.emit('attack',dataAttack);
+					}
+					if (!oldKeys[keyK] && keyboard.keys[keyK]) {
+						dataAttack['dir']['y'] = 1;
+						socket.emit('attack',dataAttack);
+					}
+					if (!oldKeys[keyL] && keyboard.keys[keyL]) {
+						dataAttack['dir']['x'] = 1;
+						socket.emit('attack',dataAttack);
+					}
+					for (prop in keyboard.keys){
+						oldKeys[prop] = keyboard.keys[prop];
+					}
+
 					grid[position].logic();
 				}
 			}
@@ -140,5 +207,12 @@
 			render();
 		}
 		requestAnimFrame(mainLoop);
+
+		window.onresize = function () {
+			canvas.width = window.innerWidth-20;
+			canvas.height = window.innerHeight-20;
+			mainLoop();
+		}
+		window.onresize();
 	</script>
 </body>
