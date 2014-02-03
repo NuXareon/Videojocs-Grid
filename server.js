@@ -21,11 +21,12 @@ io.sockets.on('connection', function(socket) {
 	function sendMap(playerCell) {
 		for (var position in grid){
 			var cell = grid[position];
-			if (Math.sqrt(Math.pow(playerCell.x-cell.x,2) + Math.pow(playerCell.y-cell.y,2)) < 7){
+			var dist = Math.abs(playerCell.x - cell.x) + Math.abs(playerCell.y - cell.y);
+			if (dist <= config.VIEW_FIELD){
 				socket.emit('gridUpdate', grid[position]);
 			} 
 			else {
-				io.sockets.emit('deleteCell', cell.pos);
+				socket.emit('deleteCell', cell.position);
 			}
 		}
 	}
@@ -63,7 +64,7 @@ io.sockets.on('connection', function(socket) {
 				newX = myCell.x + data.dir['x'];
 				newY = myCell.y + data.dir['y'];
 				var newPosition = newX+"x"+newY;
-				if (newY < nCellsY && newX < nCellsX && newY >= 0  && newX >= 0) {
+				//if (newY < nCellsY && newX < nCellsX && newY >= 0  && newX >= 0) {
 
 					 if (grid[newPosition] === undefined) {						
 						var newcell = new Cell(socket.id,newX,newY,newPosition,myCell.color);
@@ -71,7 +72,7 @@ io.sockets.on('connection', function(socket) {
 						grid[newPosition] = newcell;	//add new
 						io.sockets.emit('deleteCell', data.pos);
 						io.sockets.emit('gridUpdate', grid[newPosition]);
-
+						sendMap(grid[newPosition]);
 					}
 					else if (grid[newPosition].type == 'item') {
 
@@ -88,10 +89,10 @@ io.sockets.on('connection', function(socket) {
 						grid[newPosition] = newcell;	//add new
 						io.sockets.emit('deleteCell', data.pos);
 						io.sockets.emit('gridUpdate', grid[newPosition]);
+						sendMap(grid[newPosition]);
 					}
-				}
+			//	}
 			}
-			sendMap(grid[newPosition]);
 		}
 	});
 
