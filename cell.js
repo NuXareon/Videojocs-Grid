@@ -6,8 +6,11 @@ function Cell(playerId,posX,posY,pos,color,type,oldCol){
 	this.position = pos;
 	this.type = type || 'player';
 	this.player = playerId || undefined; //canviar nom
-	this.color = color || '#'+Math.floor(Math.random()*16777215).toString(16);
-	this.oldColor = oldCol || this.color;
+	this.color = color || this.cellColors[Math.floor(Math.random()*this.cellColors.length)];
+	this.oldColor = oldCol || this.cellColors[Math.floor(Math.random()*this.cellColors.length)];
+}
+Cell.prototype = {
+	cellColors: ["#A50000", "#D25110", "#F5FF5E", "#FF2424"]
 }
 Cell.prototype.getSightRange = function () {
 	var i = this.x;
@@ -15,47 +18,14 @@ Cell.prototype.getSightRange = function () {
 	var sightRange = {};
 
 
-	for (var i = this.x-config.VIEW_FIELD; i < this.x+config.VIEW_FIELD; ++i){
-		for (var j = this.y-config.VIEW_FIELD; j < this.y+config.VIEW_FIELD; ++j){
+	for (var i = this.x-config.VIEW_FIELD; i <= this.x+config.VIEW_FIELD; ++i){
+		for (var j = this.y-config.VIEW_FIELD; j <= this.y+config.VIEW_FIELD; ++j){
 			if (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD){
 				var position = i+'x'+j;	
 				sightRange[position] = new Cell(undefined,i,j,position);
 			}
 		}
 	}
-/*
-	while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-		while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-			var position = i+'x'+j;	
-			sightRange[position] = new Cell(undefined,i,j,position);
-			i += 1;
-		}
-		i = this.x;
-		while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-			var position = i+'x'+j;	
-			sightRange[position] = new Cell(undefined,i,j,position);
-			i -= 1;
-		}
-		j += 1;
-		i = this.x;
-	}
-	j = this.y;
-	while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-		while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-			var position = i+'x'+j;	
-			sightRange[position] = new Cell(undefined,i,j,position);
-			i += 1;
-		}
-		i = this.x;
-		while (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD) {
-			var position = i+'x'+j;	
-			sightRange[position] = new Cell(undefined,i,j,position);
-			i -= 1;
-		}
-		j -= 1;
-		i = this.x;
-	}
-	*/
 	return sightRange;
 }
 

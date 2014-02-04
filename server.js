@@ -29,20 +29,9 @@ io.sockets.on('connection', function(socket) {
 
 	// Sends local map (only cells near the player), its possible to especify another socket.
 	function sendMap(playerCell,clientSocket) {
-/*
-		camera.x += (player.x*cellSize+cellSize/2 - canvas.width/2 - camera.x)/40;
-		camera.y += (player.y*cellSize+cellSize/2 - canvas.height/2 - camera.y)/40;
 
-		initialX = Math.floor(playerCell.x);
-		initialY = Math.floor(camera.y/cellSize);
-		finalX = Math.floor(initialX + (canvas.width+cellSize)/cellSize);
-		finalY = Math.floor(initialY + (canvas.height+cellSize)/cellSize);
-*/
 		var sightRange = playerCell.getSightRange();
-
-		
-		//console.log(sightRange);
-//		for (var i = playerCell.x; i < )
+		///console.log(sightRange);
 
 		for (var position in sightRange){
 			if (grid[position] === undefined){
@@ -60,30 +49,30 @@ io.sockets.on('connection', function(socket) {
 				else {
 					clientSocket.emit('gridUpdate', cell);
 					if (players[cell.player] !== undefined) {
-						socket.emit('playerUpdate', players[cell.player].generateClientData());
+						clientSocket.emit('playerUpdate', players[cell.player].generateClientData());
 					}
 				}
 			} 
-			else {
-				// needed?
-				if (clientSocket === undefined){
-					socket.emit('deleteCell', cell.position);
-				}
-				else {
-					socket.emit('deleteCell', cell.position);
-				}
-			}
 		}
 
 	}
 
 	// Sends player info to other players (only if they are near the player), it also can delete an old position.
-	function updateAllGridInfo(newCell,oldPos) {
+	function updateAllGridInfo(newCell,oldCell) {
 		for (var playerId in players) {
-			var dist = distanceBetweenCells(newCell,players[playerId]);
-			if (dist <= config.VIEW_FIELD){
+			var distOld;
+			if (oldCell !== undefined) distOld = distanceBetweenCells(oldCell,players[playerId]);
+			var distNew = distanceBetweenCells(newCell,players[playerId]);	
+			if (distNew <= config.VIEW_FIELD || (distOld !== undefined && distOld <= config.VIEW_FIELD)){
 				var pos = players[playerId].x+'x'+players[playerId].y;
 				sendMap(grid[pos],players[playerId].socket);
+			}
+			if (distNew > config.VIEW_FIELD && distOld !== undefined && distOld <= config.VIEW_FIELD) {
+				var pos = players[playerId].x+'x'+players[playerId].y;
+				var cell = new Cell(undefined,grid[pos].x,grid[pos].y,pos,grid[pos].oldColor,'sight');
+				socket.emit('gridUpdate', cell);
+				socket.emit('deletePlayer', playerId);
+				players[playerId].socket.emit('deletePlayer', socket.id);
 			}
 		}
 	}
@@ -100,19 +89,24 @@ io.sockets.on('connection', function(socket) {
 		position = posX+"x"+posY;
 	}
 
+	var player = new Player(socket.id,100,5,posX,posY,socket);
+	players[socket.id] = player;
+
 	for (var playerId in players) {
 		if (distanceBetweenCells(players[playerId],{x:posX,y:posY}) <= config.VIEW_FIELD){
 			socket.emit('playerUpdate', players[playerId].generateClientData());
+			players[playerId].socket.emit('playerUpdate', player.generateClientData());
 		}
 	}
 
-	var player = new Player(socket.id,100,5,posX,posY,socket);
-	players[socket.id] = player;
-	io.sockets.emit('playerUpdate', player.generateClientData());
+
+	//io.sockets.emit('playerUpdate', player.generateClientData());
 	//console.log(player[socket.id].socket)
 	//io.sockets.sockets[id];
 
-	var cell = new Cell(socket.id,posX,posY,position);
+	var colorArray = ['#164cf2','#2542FF', '25DBFF', '25FF25', '004300'];
+	var color = colorArray[Math.floor(Math.random()*colorArray.length)];
+	var cell = new Cell(socket.id,posX,posY,position,color,'player');
 	grid[position] = cell;
 	//io.sockets.emit('gridUpdate', cell);
 
@@ -134,14 +128,16 @@ io.sockets.on('connection', function(socket) {
 
 					 	players[playerId].x = newX;
 					 	players[playerId].y = newY;
-//TODO:no canviar color de casella despres de passar
+
+						//console.log(grid[newPosition].color);
 						var newcell = new Cell(socket.id,newX,newY,newPosition,myCell.color,'player',grid[newPosition].color);
-						grid[data.pos] = new Cell(undefined,grid[data.pos].x,grid[data.pos].y,data.pos,grid[data.pos].oldCol,'sight'); //delete old
+						grid[data.pos].oldCol;
+						grid[data.pos] = new Cell(undefined,grid[data.pos].x,grid[data.pos].y,data.pos,grid[data.pos].oldColor,'sight'); //delete old
 						grid[newPosition] = newcell;	//add new
-						updateAllGridInfo(newcell,data.pos);
-						io.sockets.emit('deleteCell', data.pos);
+						updateAllGridInfo(newcell,grid[data.pos]);
+						//io.sockets.emit('deleteCell', data.pos);
 						//io.sockets.emit('gridUpdate', grid[newPosition]);
-						sendMap(grid[newPosition]);
+						//sendMap(grid[newPosition]);
 					}
 					else if (grid[newPosition].type == 'item') {
 
@@ -154,14 +150,13 @@ io.sockets.on('connection', function(socket) {
 					 	players[playerId].x = newX;
 					 	players[playerId].y = newY;
 
-						io.sockets.emit('playerUpdate', players[playerId].generateClientData());
-
 						var newcell = new Cell(socket.id,newX,newY,newPosition,myCell.color);
-						delete grid[data.pos]; //delete old
+						grid[data.pos] = new Cell(undefined,grid[data.pos].x,grid[data.pos].y,data.pos,grid[data.pos].oldColor,'sight'); //delete old
 						grid[newPosition] = newcell;	//add new
-						io.sockets.emit('deleteCell', data.pos);
-						io.sockets.emit('gridUpdate', grid[newPosition]);
-						sendMap(grid[newPosition]);
+						//io.sockets.emit('deleteCell', data.pos);
+						//io.sockets.emit('gridUpdate', grid[newPosition]);
+						updateAllGridInfo(newcell,grid[data.pos]);
+						//sendMap(grid[newPosition]);
 					}
 			//	}
 			}
@@ -186,14 +181,14 @@ io.sockets.on('connection', function(socket) {
 	});
 
 	socket.on('disconnect', function (){
-		for (var position in grid) {
-			if (grid[position].player == socket.id) {
-				delete grid[position];
-				socket.broadcast.emit('deleteCell', position);
-				delete players[socket.id];
-				socket.broadcast.emit('deletePlayer', socket.id);
-			}
-		}
+		var pos = players[socket.id].x+'x'+players[socket.id].y;
+		var newCell = new Cell(undefined,players[socket.id].x,players[socket.id].y,pos,undefined,'sight')
+		grid[pos] = newCell;
+		delete players[socket.id];
+		updateAllGridInfo(newCell);
+		io.sockets.emit('deletePlayer', socket.id);
+		//delete grid[pos];
+		//socket.broadcast.emit('deleteCell', position);
 	});
 });
 

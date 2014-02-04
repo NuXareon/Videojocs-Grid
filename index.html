@@ -23,7 +23,7 @@
 		var context = canvas.getContext('2d');
 
 		var keyboard = new KeyboardJS(false);
-		var camera = new Camera(canvas.width/2, canvas.height/2);
+		var camera;
 
 		var map_width = 1200;
 		var map_height = 1200;
@@ -46,15 +46,18 @@
 		var keyK = 75;
 		var keyL = 76;
 
-		function Camera(x,y,type){
+		var localPlayerPosition;
+
+		function Camera(x,y){
 			this.x = x-canvas.width/2;
 			this.y = y-canvas.height/2;
 		}
 
-		function Cell(x,y,type){
+		function Cell(x,y,type,color){
 			this.x = x;
 			this.y = y;
 			this.type = type || 'fog';
+			this.color = color;
 		}
 		Cell.prototype.render = function (ctx) {
 			if (this.type == 'fog'){
@@ -66,11 +69,19 @@
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 			}
 			else if (this.type == "seen") {
-				ctx.fillStyle = this.color || 'lightgrey';
+				ctx.globalAlpha = 0.5;
+				ctx.fillStyle = this.color;
+				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
+				ctx.fillStyle = 'lightgrey';
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 			}
 			else {
-				ctx.fillStyle = 'white';
+				if (Math.abs(grid[localPlayerPosition].x - this.x) + Math.abs(grid[localPlayerPosition].y - this.y) > view_field) { 
+					ctx.globalAlpha = 0.5;
+					ctx.fillStyle = 'lightgrey';
+					ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
+				}
+				ctx.fillStyle = this.oldColor || 'white';
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 				ctx.fillStyle = this.color;
 				ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
@@ -80,7 +91,7 @@
 			ctx.strokeRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 
 			// pintem health bar
-			if (this.type == 'player'){
+			if (this.type == 'player' && players[this.player] !== undefined){
 				ctx.fillStyle = 'red';
 				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,cellSize-margin*2+6,5);
 				ctx.fillStyle = 'green';
@@ -106,6 +117,8 @@
 		Player.prototype.updateData = function (player){
 			this.HP = player.HP;
 			this.AD = player.AD;
+			this.x = player.x;
+			this.y = player.y;
 		}
 
 		socket.on('playerUpdate', function (player){
@@ -114,6 +127,7 @@
 				players[player.id] = newPlayer;
 			}
 			players[player.id].updateData(player);
+			if (player.id == socket.socket.sessionid) localPlayerPosition = player.x+'x'+player.y;
 		});
 
 		socket.on('deletePlayer', function (id) {
@@ -121,43 +135,29 @@
 		});
 
 		socket.on('gridUpdate', function (cell) {
-			var playerCell = new Cell(0,0,'loading');
-			for (position in grid){
-				if (grid[position].player == socket.socket.sessionid){
-					playerCell = grid[position];
-				}
-			}
 
-			if (playerCell.type == 'loading' || Math.abs(playerCell.x - cell.x) + Math.abs(playerCell.y - cell.y) <= view_field){
-				var newcell = new Cell(cell.x,cell.y);
-				newcell.position = cell.position;
-				newcell.type = cell.type;
-				newcell.player = cell.player;
-				newcell.color = cell.color;
-				newcell.AD = cell.AD;
-				newcell.HP = cell.HP;
-				grid[cell.position] = newcell;
-			}
+			var newcell = new Cell(cell.x,cell.y);
+			newcell.position = cell.position;
+			newcell.type = cell.type;
+			newcell.player = cell.player;
+			newcell.color = cell.color;
+			newcell.AD = cell.AD;
+			newcell.HP = cell.HP;
+			newcell.oldColor = cell.oldColor;
+			grid[cell.position] = newcell;
 		});
 
 		socket.on('deleteCell', function (pos) {
-			var playerCell = new Cell(0,0,'loading');
-			for (position in grid){
-				if (grid[position].player == socket.socket.sessionid){
-					playerCell = grid[position];
-				}
-			}
 
 			if (grid[pos] !== undefined){
 				if (grid[pos].type !== 'wall'){
-					//if (Math.abs(playerCell.x - grid[pos].x) + Math.abs(playerCell.y - grid[pos].y) <= view_field){
-						var newcell = new Cell();
-						newcell.x = grid[pos].x;
-						newcell.y = grid[pos].y;
-						newcell.type = 'seen';
-						grid[pos] = newcell;
+					var newcell = new Cell();
+					newcell.x = grid[pos].x;
+					newcell.y = grid[pos].y;
+					newcell.type = 'seen';
+					grid[pos] = newcell;
 
-					//}
+					
 				}
 			}
 		});
@@ -195,98 +195,94 @@
 
 		function render() {
 
-			var player = new Cell(0,0,'loading');
-
 			//	Camera translate
-			for (position in grid){
-				if (grid[position].player == socket.socket.sessionid){
-					player = grid[position];
-					camera.x += (player.x*cellSize+cellSize/2 - canvas.width/2 - camera.x)/40;
-					camera.y += (player.y*cellSize+cellSize/2 - canvas.height/2 - camera.y)/40;
+			var player = grid[localPlayerPosition];
+			if (player !== undefined) {
+				if (camera === undefined) {
+					camera = new Camera(player.x*cellSize+cellSize/2,player.y*cellSize+cellSize/2);
 				}
-			}
 
-			initialX = Math.floor(camera.x/cellSize);
-			initialY = Math.floor(camera.y/cellSize);
-			finalX = Math.floor(initialX + (canvas.width+cellSize)/cellSize);
-			finalY = Math.floor(initialY + (canvas.height+cellSize)/cellSize);
+				camera.x += (player.x*cellSize+cellSize/2 - canvas.width/2 - camera.x)/40;
+				camera.y += (player.y*cellSize+cellSize/2 - canvas.height/2 - camera.y)/40;
 
-			context.save();
-			context.translate(-camera.x,-camera.y);
-			context.translate(margin,margin);
 
-			//printFogOfWar(context,player);	
+				initialX = Math.floor(camera.x/cellSize);
+				initialY = Math.floor(camera.y/cellSize);
+				finalX = Math.floor(initialX + (canvas.width+cellSize)/cellSize);
+				finalY = Math.floor(initialY + (canvas.height+cellSize)/cellSize);
 
-			if (player.type == 'loading'){
-				context.clearRect(0,0,canvas.width,canvas.height);
-			}
-			else {
+				context.save();
+				context.translate(-camera.x,-camera.y);
+				context.translate(margin,margin);
+
+				//printFogOfWar(context,player);	
+
 				for (var i = initialX; i <= finalX; i++) {		
 					for (var j = initialY; j <= finalY; j++){
 						var coord = i+'x'+j;
 						if (grid[coord] === undefined){
-							console.log(coord);
+							//console.log(coord);
 							grid[coord] = new Cell(i,j,'fog');
 						}
 						grid[coord].logic(player);
+						context.save();
 						grid[coord].render(context);
+						context.restore();
+					}
+				}	
+				for (enemyPlayer in players) {
+					var enemyPos = players[enemyPlayer].x+'x'+players[enemyPlayer].y;
+					if (Math.abs(player.x - players[enemyPlayer].x) + Math.abs(player.y - players[enemyPlayer].y) > view_field && grid[enemyPos] !== undefined) {
+						grid[enemyPos] = new Cell(players[enemyPlayer].x,players[enemyPlayer].y,'seen',grid[enemyPos].oldColor);
 					}
 				}
+				context.restore();
 			}
-			context.restore()
 		}
 
 		function logic() {
 
-			var player = new Cell();
-
-			for (position in grid) {
-				if (grid[position].player == socket.socket.sessionid) { 
-
-					var player = grid[position];
-
-					//	Movement keys (WASD)
-					var dataMove = {pos: position, dir:{x:0,y:0}};
-					if (!oldKeys[keyW] && keyboard.keys[keyW]) {
-						dataMove['dir']['y'] = -1;
-						socket.emit('move',dataMove);
-					}
-					if (!oldKeys[keyA] && keyboard.keys[keyA]) {
-						dataMove['dir']['x'] = -1;
-						socket.emit('move',dataMove);
-					}
-					if (!oldKeys[keyS] && keyboard.keys[keyS]) {
-						dataMove['dir']['y'] = 1;
-						socket.emit('move',dataMove);
-					}
-					if (!oldKeys[keyD] && keyboard.keys[keyD]) {
-						dataMove['dir']['x'] = 1;
-						socket.emit('move',dataMove);
-					}
-
-					//	Attack keys(IJKL)
-					var dataAttack = {pos: position, dir:{x:0,y:0}};
-					if (!oldKeys[keyI] && keyboard.keys[keyI]) {
-						dataAttack['dir']['y'] = -1;
-						socket.emit('attack',dataAttack);
-					}
-					if (!oldKeys[keyJ] && keyboard.keys[keyJ]) {
-						dataAttack['dir']['x'] = -1;
-						socket.emit('attack',dataAttack);
-					}
-					if (!oldKeys[keyK] && keyboard.keys[keyK]) {
-						dataAttack['dir']['y'] = 1;
-						socket.emit('attack',dataAttack);
-					}
-					if (!oldKeys[keyL] && keyboard.keys[keyL]) {
-						dataAttack['dir']['x'] = 1;
-						socket.emit('attack',dataAttack);
-					}
-					for (prop in keyboard.keys){
-						oldKeys[prop] = keyboard.keys[prop];
-					}					
-				}
+			//	Movement keys (WASD)
+			var dataMove = {pos: localPlayerPosition, dir:{x:0,y:0}};
+			if (!oldKeys[keyW] && keyboard.keys[keyW]) {
+				dataMove['dir']['y'] = -1;
+				socket.emit('move',dataMove);
 			}
+			if (!oldKeys[keyA] && keyboard.keys[keyA]) {
+				dataMove['dir']['x'] = -1;
+				socket.emit('move',dataMove);
+			}
+			if (!oldKeys[keyS] && keyboard.keys[keyS]) {
+				dataMove['dir']['y'] = 1;
+				socket.emit('move',dataMove);
+			}
+			if (!oldKeys[keyD] && keyboard.keys[keyD]) {
+				dataMove['dir']['x'] = 1;
+				socket.emit('move',dataMove);
+			}
+
+			//	Attack keys(IJKL)
+			var dataAttack = {pos: localPlayerPosition, dir:{x:0,y:0}};
+			if (!oldKeys[keyI] && keyboard.keys[keyI]) {
+				dataAttack['dir']['y'] = -1;
+				socket.emit('attack',dataAttack);
+			}
+			if (!oldKeys[keyJ] && keyboard.keys[keyJ]) {
+				dataAttack['dir']['x'] = -1;
+				socket.emit('attack',dataAttack);
+			}
+			if (!oldKeys[keyK] && keyboard.keys[keyK]) {
+				dataAttack['dir']['y'] = 1;
+				socket.emit('attack',dataAttack);
+			}
+			if (!oldKeys[keyL] && keyboard.keys[keyL]) {
+				dataAttack['dir']['x'] = 1;
+				socket.emit('attack',dataAttack);
+			}
+			for (prop in keyboard.keys){
+				oldKeys[prop] = keyboard.keys[prop];
+			}					
+			
 		}
 
 		function mainLoop() {

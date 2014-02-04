@@ -1,0 +1,12 @@
+* Fix player color change cell when moving - server ---------------------------------------------------- DONE
+* Fix multiple cell with same color and color change issue - server------------------------------------- DONE
+* Fix blanc cells at extrem right sight view - server -------------------------------------------------- DONE
+* Fix color when player spawns/grabs item -server ------------------------------------------------------ DONE
+* Fix object iteration issues (performance) - client --------------------------------------------------- DONE
+* Fix delete of players outside of sight range (causing their path to be marked as seen) - server ------ DONE
+* Set global alpha on seen paths - client -------------------------------------------------------------- DONE
+* Reduce map size on client (delete unseen cells) - client --------------------------------------------- MEH
+* Fix map sending (only send new cells) - server (and client prob.)
+* Move server functions outside the event connection - server
+* PUT A FUCKIN REAL INFINITY EDGE
+* Add bots (parrrty hard)
