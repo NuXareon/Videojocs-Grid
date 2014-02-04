@@ -62,11 +62,11 @@
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 			}
 			else if (this.type == "sight") {
-				ctx.fillStyle = 'white';
+				ctx.fillStyle = this.color || 'white';
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 			}
 			else if (this.type == "seen") {
-				ctx.fillStyle = 'lightgrey';
+				ctx.fillStyle = this.color || 'lightgrey';
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 			}
 			else {
@@ -150,9 +150,14 @@
 
 			if (grid[pos] !== undefined){
 				if (grid[pos].type !== 'wall'){
-					if (Math.abs(playerCell.x - grid[pos].x) + Math.abs(playerCell.y - grid[pos].y) <= view_field){
-						delete grid[pos];
-					}
+					//if (Math.abs(playerCell.x - grid[pos].x) + Math.abs(playerCell.y - grid[pos].y) <= view_field){
+						var newcell = new Cell();
+						newcell.x = grid[pos].x;
+						newcell.y = grid[pos].y;
+						newcell.type = 'seen';
+						grid[pos] = newcell;
+
+					//}
 				}
 			}
 		});
@@ -220,6 +225,7 @@
 					for (var j = initialY; j <= finalY; j++){
 						var coord = i+'x'+j;
 						if (grid[coord] === undefined){
+							console.log(coord);
 							grid[coord] = new Cell(i,j,'fog');
 						}
 						grid[coord].logic(player);
