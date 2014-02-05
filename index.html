@@ -91,11 +91,11 @@
 			ctx.strokeRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 
 			// pintem health bar
-			if (this.type == 'player' && players[this.player] !== undefined){
+			if ((this.type == 'player' || this.type == 'monster') && players[this.player] !== undefined){
 				ctx.fillStyle = 'red';
 				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,cellSize-margin*2+6,5);
 				ctx.fillStyle = 'green';
-				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,(cellSize-margin*2+6)*players[this.player].HP/100,5);
+				ctx.fillRect(this.x*cellSize-3,this.y*cellSize-8,(cellSize-margin*2+6)*players[this.player].HP/players[this.player].maxHP,5);
 			}
 		}
 		Cell.prototype.logic = function(playerCell) {
@@ -116,6 +116,7 @@
 		}
 		Player.prototype.updateData = function (player){
 			this.HP = player.HP;
+			this.maxHP = player.maxHP;
 			this.AD = player.AD;
 			this.x = player.x;
 			this.y = player.y;
