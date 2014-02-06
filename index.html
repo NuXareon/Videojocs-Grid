@@ -9,6 +9,8 @@
 	<script src="requestAnimFrame.js"></script>
 	<script src="Keyboard.js"></script>
 	<script src="socket.io.min.js"></script>
+	<script src="jquery-1.9.1.min.js"></script>
+	<script src="Eximo.js"></script>
 </head>
 <body>
 	<div id="canvas">
@@ -48,6 +50,12 @@
 
 		var localPlayerPosition;
 
+		// npm install http-server -g (needs to run on a server)
+		// http-server .
+		Eximo.loadSpriteSheets(['spJSON.json'], function () {
+			console.log('Sprite sheets loaded!');
+		});
+
 		function Camera(x,y){
 			this.x = x-canvas.width/2;
 			this.y = y-canvas.height/2;
@@ -83,10 +91,30 @@
 				}
 				ctx.fillStyle = this.oldColor || 'white';
 				ctx.fillRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
-				ctx.fillStyle = this.color;
-				ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+				if (this.type == 'item') {
+					if (this.player == 'INFINITY_EDGE') {
+						Eximo.drawSprite('infinity_edge.png', ctx, this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);	
+					}
+					else if (this.player == 'WARMOG') {
+						Eximo.drawSprite('warmogs.png', ctx, this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+					}
+					else if (this.player == 'HEALTH_POTION'){
+						Eximo.drawSprite('health_potion.jpg', ctx, this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+					}
+					else {
+						ctx.fillStyle = this.color;
+						ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);						
+					}
+				}
+				else if (this.type == 'monster') {
+					Eximo.drawSprite('wolf.png', ctx, this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+				}
+				else {
+					ctx.fillStyle = this.color;
+					ctx.fillRect(this.x*cellSize,this.y*cellSize,cellSize-margin*2,cellSize-margin*2);
+				}
 			}
-			//Pintem requadre
+			//Pintem requadre (grid)
 			ctx.strokeStyle = 'black';
 			ctx.strokeRect(this.x*cellSize-margin,this.y*cellSize-margin,cellSize,cellSize);
 
@@ -120,6 +148,7 @@
 			this.AD = player.AD;
 			this.x = player.x;
 			this.y = player.y;
+			this.score = player.score;
 		}
 
 		socket.on('playerUpdate', function (player){
