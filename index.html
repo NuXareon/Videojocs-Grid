@@ -157,42 +157,9 @@
 					newcell.y = grid[pos].y;
 					newcell.type = 'seen';
 					grid[pos] = newcell;
-
-					
 				}
 			}
 		});
-
-		function printGrid (ctx) {
-
-			ctx.strokeStyle = 'black';
-
-			// Iterate for x.
-			for (var i = 0; i <= map_width; i += cellSize) {
-				ctx.beginPath();
-				ctx.moveTo(i,0);
-				ctx.lineTo(i,map_height);
-				ctx.stroke();
-			}
-
-			// Iterate for y.
-			for (var i = 0; i <= map_height; i += cellSize) {
-				ctx.beginPath();
-				ctx.moveTo(0,i);
-				ctx.lineTo(map_width,i);
-				ctx.stroke();
-			}
-		}
-
-		function printFogOfWar (ctx,cell) {
-
-			vision = Math.floor(cell.x*cellSize-view_field*cellSize);
-			ctx.fillStyle = 'white';
-
-			for (var i = 0; i < view_field+1; ++i) {
-				ctx.fillRect(vision+i*cellSize-margin,(cell.y-i)*cellSize-margin,(view_field-i)*cellSize*2+cellSize,(2*i+1)*cellSize);
-			}
-		}
 
 		function render() {
 
@@ -216,8 +183,6 @@
 				context.translate(-camera.x,-camera.y);
 				context.translate(margin,margin);
 
-				//printFogOfWar(context,player);	
-
 				for (var i = initialX; i <= finalX; i++) {		
 					for (var j = initialY; j <= finalY; j++){
 						var coord = i+'x'+j;
@@ -231,6 +196,8 @@
 						context.restore();
 					}
 				}	
+
+				// TODO: not luck at all players
 				for (enemyPlayer in players) {
 					var enemyPos = players[enemyPlayer].x+'x'+players[enemyPlayer].y;
 					if (Math.abs(player.x - players[enemyPlayer].x) + Math.abs(player.y - players[enemyPlayer].y) > view_field && grid[enemyPos] !== undefined) {

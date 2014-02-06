@@ -17,7 +17,6 @@ Cell.prototype.getSightRange = function () {
 	var j = this.y;
 	var sightRange = {};
 
-
 	for (var i = this.x-config.VIEW_FIELD; i <= this.x+config.VIEW_FIELD; ++i){
 		for (var j = this.y-config.VIEW_FIELD; j <= this.y+config.VIEW_FIELD; ++j){
 			if (Math.abs(this.x - i) + Math.abs(this.y - j) <= config.VIEW_FIELD){

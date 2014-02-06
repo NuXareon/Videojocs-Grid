@@ -86,11 +86,33 @@ function sendMap(playerCell,clientSocket) {
 
 // Sends player info to other players (only if they are near the player), it also can delete an old position.
 function updateAllGridInfo(newCell,oldCell,socket) {
+/*
+	var sightRangeOld;
+	var sightRangeNew = newCell.getSightRange();
+	var sightRange = sightRangeNew;
+	if (oldCell !== undefined) {
+		sightRangeOld = oldCell.getSightRange();
+	}
+	for (var position in sightRange){
+		if (grid[position] !== undefined && grid[position].type == 'player') {
+			var playerId = grid[position].player;
+			sendMap(grid[position],players[playerId].socket);
+		}
+	}
+
+	for (var position in sightRange){
+		if (grid[position] !== undefined && grid[position].type == 'player') {
+			var playerId = grid[position].player;
+		}
+	}
+*/
+	// TODO: not luck at all players
 	for (var playerId in players) {
 		if (players[playerId].socket !== undefined){
 			var distOld;
 			if (oldCell !== undefined) distOld = distanceBetweenCells(oldCell,players[playerId]);
 			var distNew = distanceBetweenCells(newCell,players[playerId]);	
+
 			if (distNew <= config.VIEW_FIELD || (distOld !== undefined && distOld <= config.VIEW_FIELD)){
 				var pos = players[playerId].x+'x'+players[playerId].y;
 				sendMap(grid[pos],players[playerId].socket);
@@ -106,6 +128,53 @@ function updateAllGridInfo(newCell,oldCell,socket) {
 	}
 }
 
+function findClosestPlayer (cell,range) {
+	var neighbours = [];
+	var seen = {};
+	neighbours.push(cell.position);
+	seen[cell.position] = cell.position;
+	while (neighbours.length > 0) {
+		var candidatePos = neighbours.splice(0,1);
+		candidatePos = candidatePos[0];
+		if (grid[candidatePos].type == 'player' && candidatePos != cell.position) return candidatePos;
+
+		var newX = grid[candidatePos].x+1
+		var newY = grid[candidatePos].y
+		var newPos = newX+'x'+newY;
+		if (seen[newPos] === undefined && distanceBetweenCells(cell,{x:newX,y:newY}) <= range) {
+			seen[newPos] = newPos;
+			neighbours.push(newPos);
+		}
+
+		var newX = grid[candidatePos].x-1
+		var newY = grid[candidatePos].y
+		var newPos = newX+'x'+newY;
+		if (seen[newPos] === undefined && distanceBetweenCells(cell,{x:newX,y:newY}) <= range) {
+			seen[newPos] = newPos;
+			neighbours.push(newPos);
+		}
+
+		var newX = grid[candidatePos].x
+		var newY = grid[candidatePos].y+1
+		var newPos = newX+'x'+newY;
+		if (seen[newPos] === undefined && distanceBetweenCells(cell,{x:newX,y:newY}) <= range) {
+			seen[newPos] = newPos;
+			neighbours.push(newPos);
+		}
+
+		var newX = grid[candidatePos].x
+		var newY = grid[candidatePos].y-1
+		var newPos = newX+'x'+newY;
+		if (seen[newPos] === undefined && distanceBetweenCells(cell,{x:newX,y:newY}) <= range) {
+			seen[newPos] = newPos;
+			neighbours.push(newPos);
+		}
+	}
+	var result = 0;
+	return result;
+
+}
+
 // kill someone
 function killMonster(monsterId) {
 	var monster = players[monsterId];
@@ -116,6 +185,16 @@ function killMonster(monsterId) {
 	delete players[monsterId];
 	delete monsters[monsterId];
 
+	var sightRange = monsterCell.getSightRange();
+	for (var position in sightRange){
+		if (grid[position] !== undefined && grid[position].type == 'player') {
+			var playerId = grid[position].player;
+			players[playerId].socket.emit('gridUpdate', grid[pos]);
+			players[playerId].socket.emit('deletePlayer', monsterId);
+		}
+	}
+/*
+	// TODO: not luck at all players
 	for (var playerId in players) {
 		if (players[playerId].socket !== undefined) {
 			if (distanceBetweenCells(monsterCell,players[playerId]) <= config.VIEW_FIELD){
@@ -126,6 +205,7 @@ function killMonster(monsterId) {
 
 		}
 	}
+	*/
 }
 
 function killPlayer(enemyId) {
@@ -137,7 +217,7 @@ function killPlayer(enemyId) {
 
 	var newPos;
 	var posX, posY;
-		while (newPos === undefined || grid[newPos] !== undefined) {
+	while (newPos === undefined || grid[newPos] !== undefined && grid[newPos].type != 'sight') {
 		var nCellsX = config.MAP_WIDTH/config.CELL_SIZE;
 		var nCellsY = config.MAP_HEIGHT/config.CELL_SIZE;
 		posX = Math.random()*config.MAP_WIDTH;
@@ -149,6 +229,10 @@ function killPlayer(enemyId) {
 
 	players[enemyId] = new Player(enemyId,config.PLAYER_INITIAL_HP,config.PLAYER_INITIAL_AD,posX,posY,enemyPlayer.socket);
 	grid[newPos] = new Cell(enemyId,posX,posY,newPos,enemyPlayerCell.color,'player');
+	//enemyPlayer.socket.emit('gridUpdate', grid[pos]);
+
+	//flush client data.
+	updateAllGridInfo(grid[newPos],grid[pos],enemyPlayer.socket);
 }
 
 
@@ -178,18 +262,29 @@ io.sockets.on('connection', function(socket) {
 	var player = new Player(socket.id,config.PLAYER_INITIAL_HP,config.PLAYER_INITIAL_AD,posX,posY,socket);
 	players[socket.id] = player;
 
-	for (var playerId in players) {
-		if (distanceBetweenCells(players[playerId],{x:posX,y:posY}) <= config.VIEW_FIELD){
-			socket.emit('playerUpdate', players[playerId].generateClientData());
-			if (players[playerId].socket !== undefined) players[playerId].socket.emit('playerUpdate', player.generateClientData());
-		}
-	}
 
 	var colorArray = ['#164cf2','#2542FF', '25DBFF', '25FF25', '004300'];
 	var color = colorArray[Math.floor(Math.random()*colorArray.length)];
 	var cell = new Cell(socket.id,posX,posY,position,color,'player');
 	grid[position] = cell;
 
+	// TODO: not luck at all players
+	var sightRange = cell.getSightRange();
+	for (var position in sightRange){
+		if (grid[position] !== undefined && grid[position].type == 'player') {
+			var playerId = grid[position].player;
+			socket.emit('playerUpdate', players[playerId].generateClientData());
+			if (players[playerId].socket !== undefined) players[playerId].socket.emit('playerUpdate', player.generateClientData());
+		}
+	}
+	/*
+	for (var playerId in players) {
+		if (distanceBetweenCells(players[playerId],{x:posX,y:posY}) <= config.VIEW_FIELD){
+			socket.emit('playerUpdate', players[playerId].generateClientData());
+			if (players[playerId].socket !== undefined) players[playerId].socket.emit('playerUpdate', player.generateClientData());
+		}
+	}
+*/
 	updateAllGridInfo(cell,undefined,socket);
 
 	socket.on('move', function (data) {
@@ -213,6 +308,9 @@ io.sockets.on('connection', function(socket) {
 					grid[newPosition] = newcell;	//add new
 
 					updateAllGridInfo(newcell,grid[data.pos],socket);
+
+					var closestPlayer = findClosestPlayer(newcell,Monsters.WOLF_RANGE);
+					console.log(closestPlayer);
 				}
 				else if (grid[newPosition].type == 'item') {
 
@@ -254,10 +352,10 @@ io.sockets.on('connection', function(socket) {
 					enemyId = grid[enemyPosition].player;
 					players[enemyId].HP -= players[myCell.player].AD;
 
-					if (players[enemyId].HP < 0) {
+					if (players[enemyId].HP <= 0) {
 						players[enemyId].HP = 0;
-						if (monsters[enemyId] !== undefined) killMonster(enemyId);
-						else killPlayer(enemyId);
+						if (monsters[enemyId] !== undefined) killMonster(enemyId,playerId);
+						else killPlayer(enemyId,playerId);
 					}
 
 					if (players[enemyId] !== undefined) io.sockets.emit('playerUpdate', players[enemyId].generateClientData());

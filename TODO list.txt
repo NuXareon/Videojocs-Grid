@@ -7,6 +7,7 @@
 * Set global alpha on seen paths - client -------------------------------------------------------------- DONE
 * Reduce map size on client (delete unseen cells) - client --------------------------------------------- MEH
 * Fix map sending (only send new cells) - server (and client prob.)
+* Fix spawn bug (let spawn un seen cells)
 * Move server functions outside the event connection - server
 * PUT A FUCKIN REAL INFINITY EDGE, WARMOG AND HEALTH POTION
 * Add bots (parrrty hard)
