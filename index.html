@@ -16,10 +16,21 @@
 	<div id="canvas">
 		<canvas id="myCanvas"></canvas>
 	</div>
+	<div id="highScoreTable">
+		<h2> HIGH SCORES </h2>
+		<p> Llista de highscores: <p>
+			<div id="scoreList"></div>
+	</div>
 	<script>
+
+		var username = prompt("Enter your username:") || "Anonymous";
 
 		var socket = io.connect('http://localhost:4242');
 		socket.id = socket.socket.sessionid;
+
+		socket.on('connect', function () {
+			socket.emit('setUsername', username);
+		});
 
 		var canvas = document.getElementById('myCanvas');
 		var context = canvas.getContext('2d');
@@ -149,6 +160,7 @@
 			this.x = player.x;
 			this.y = player.y;
 			this.score = player.score;
+			this.username = player.username;
 		}
 
 		socket.on('playerUpdate', function (player){
@@ -188,6 +200,16 @@
 					grid[pos] = newcell;
 				}
 			}
+		});
+
+		socket.on('printScores', function (data){
+			var highScoreDiv = document.getElementById('scoreList');
+			var hsHTML = "<ul>"
+			for (score in data){
+				hsHTML += "<li>"+data[score].date+" - "+data[score].username+": "+data[score].score+"</li>";
+			}
+			hsHTML += "</ul>"
+			highScoreDiv.innerHTML = hsHTML;
 		});
 
 		function render() {

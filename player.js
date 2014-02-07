@@ -7,6 +7,7 @@ function Player(id,HP,AD,posX,posY,socket){
 	this.y = posY;
 	this.socket = socket;
 	this.score = 0;
+	this.username = 'Anonymous';
 }
 Player.prototype.generateClientData = function () {
 	var data = {id:this.id,HP:this.HP,maxHP:this.maxHP,AD:this.AD,x:this.x,y:this.y,score:this.score};
@@ -14,6 +15,9 @@ Player.prototype.generateClientData = function () {
 }
 Player.prototype.increaseScore = function (n) {
 	this.score += n;
+}
+Player.prototype.setUsername = function (username) {
+	this.username = username;
 }
 
 module.exports = Player;

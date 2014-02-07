@@ -1,3 +1,7 @@
+var mongoose = require('mongoose');
+var mongoURI = 'mongodb://localhost:/HighScoreTable';
+var db = mongoose.connect(mongoURI);
+
 var io = require('socket.io').listen(4242);
 io.set('log level',1);
 
@@ -6,6 +10,7 @@ var Cell = require('./cell.js');
 var Player = require('./Player.js')
 var Monsters = require('./monsters.js')
 var Items = require('./items.js')
+var Score = require('./Score.js')
 
 var grid = {};
 var players = {};
@@ -20,7 +25,7 @@ function distanceBetweenCells(data1,data2){
 function sendMap(playerCell,clientSocket) {
 
 	var sightRange = playerCell.getSightRange();
-	console.log('sending map...');
+	//console.log('sending map...');
 
 	for (var position in sightRange){
 		if (grid[position] === undefined){
@@ -223,6 +228,24 @@ function killPlayer(enemyId,scorePlayerId) {
 
 	grid[pos] = new Cell(undefined,enemyPlayerCell.x,enemyPlayerCell.y,enemyPlayerCell.position,enemyPlayerCell.oldColor,'sight');
 
+	// Saving player score
+	var totalScore = new Score();
+	totalScore.username = players[enemyId].username;
+	totalScore.score = players[enemyId].score;
+	totalScore.date = new Date ();
+	totalScore.save();
+
+	Score.getHighScore(5, function (scores) {
+		var data = [];
+		for (var i = 0; i < scores.length; ++i){
+			var score = scores[i];
+			delete score._id;
+			delete score.__v;
+			data.push(score);
+		}
+		io.sockets.emit('printScores',data);
+	});
+
 	var newPos;
 	var posX, posY;
 	while (newPos === undefined || grid[newPos] !== undefined && grid[newPos].type != 'sight') {
@@ -236,6 +259,7 @@ function killPlayer(enemyId,scorePlayerId) {
 	}
 
 	players[enemyId] = new Player(enemyId,config.PLAYER_INITIAL_HP,config.PLAYER_INITIAL_AD,posX,posY,enemyPlayer.socket);
+	players[enemyId].username = enemyPlayer.username;
 	grid[newPos] = new Cell(enemyId,posX,posY,newPos,enemyPlayerCell.color,'player');
 	players[scorePlayerId].increaseScore(50);
 	//enemyPlayer.socket.emit('gridUpdate', grid[pos]);
@@ -325,6 +349,10 @@ io.sockets.on('connection', function(socket) {
 	}
 */
 	updateAllGridInfo(cell,undefined,socket);
+
+	socket.on('setUsername', function (username){
+		players[socket.id].username = username;
+	});
 
 	socket.on('move', function (data) {
 		if (grid[data.pos] !== undefined && grid[data.pos].player == socket.id){
